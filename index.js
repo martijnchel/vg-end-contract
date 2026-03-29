@@ -65,6 +65,7 @@ async function runRetentionBot() {
                         await axios.post(MAKE_WEBHOOK_VERLENGING, {
                             member_id: member.member_id,
                             voornaam: member.firstname,
+                            achternaam: member.lastname,
                             telefoon: member.mobile || member.phone,
                             contract_naam: contract.membership_name,
                             einddatum: contract.contract_end_date,
