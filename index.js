@@ -5,82 +5,38 @@ const API_KEY = process.env.API_KEY;
 const CLUB_SECRET = process.env.CLUB_SECRET;
 const MAKE_WEBHOOK_VERLENGING = process.env.MAKE_WEBHOOK_VERLENGING; 
 
-const MAX_PER_DAG = 30; 
-const WINDOW_START = 65; 
-const WINDOW_END = 50;   
-const MIN_VISITS_RECENT = 1; 
+const MAX_PER_DAG = 1; 
 const RECENT_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function runRetentionBot() {
-    console.log(`--- [START] BATCH SCAN (T-65 tot T-50) - MAX 30 ---`);
-
-    const today = new Date();
-    const dateStart = new Date();
-    dateStart.setDate(today.getDate() + WINDOW_END);
-    const dateEnd = new Date();
-    dateEnd.setDate(today.getDate() + WINDOW_START);
+async function runTest() {
+    console.log(`--- [TEST RUN] TRIGGER MAKE WEBHOOK (Inclusief Achternaam) ---`);
     const timestamp90DaysAgo = Date.now() - RECENT_WINDOW_MS;
 
-    let fromId = 0;
-    let hasMore = true;
-    let sentCount = 0;
-
     try {
-        while (hasMore && sentCount < MAX_PER_DAG) {
-            const res = await axios.get(`https://api.virtuagym.com/api/v1/club/${CLUB_ID}/member`, {
-                params: { 
-                    api_key: API_KEY, 
-                    club_secret: CLUB_SECRET, 
-                    with: 'active_memberships',
-                    from_id: fromId,
-                    limit: 1000 
-                }
+        const res = await axios.get(`https://api.virtuagym.com/api/v1/club/${CLUB_ID}/member`, {
+            params: { api_key: API_KEY, club_secret: CLUB_SECRET, with: 'active_memberships', limit: 50 }
+        });
+
+        const members = res.data.result || [];
+        for (const member of members) {
+            const vRes = await axios.get(`https://api.virtuagym.com/api/v1/club/${CLUB_ID}/visits`, {
+                params: { api_key: API_KEY, club_secret: CLUB_SECRET, member_id: member.member_id, sync_from: timestamp90DaysAgo }
             });
 
-            const members = res.data.result || [];
-            if (members.length === 0) break;
-
-            for (const member of members) {
-                if (sentCount >= MAX_PER_DAG) break;
-                fromId = Math.max(fromId, member.member_id);
-                if (!member.active_memberships) continue;
-
-                const contract = member.active_memberships.find(m => {
-                    const name = (m.membership_name || "").toLowerCase();
-                    const isRightType = name.includes('complete') || name.includes('focus');
-                    const endDate = new Date(m.contract_end_date);
-                    const isWithinWindow = endDate >= dateStart && endDate <= dateEnd;
-                    return isRightType && isWithinWindow;
+            if (vRes.data.result && vRes.data.result.length > 0) {
+                await axios.post(MAKE_WEBHOOK_VERLENGING, {
+                    member_id: member.member_id,
+                    voornaam: member.firstname,
+                    achternaam: member.lastname, // Nieuw veld
+                    telefoon: member.mobile || member.phone,
+                    contract_naam: "TEST-CONTRACT COMPLETE",
+                    einddatum: "2026-06-01",
+                    bezoeken_90_dagen: vRes.data.result.length
                 });
-
-                if (contract) {
-                    const vRes = await axios.get(`https://api.virtuagym.com/api/v1/club/${CLUB_ID}/visits`, {
-                        params: { api_key: API_KEY, club_secret: CLUB_SECRET, member_id: member.member_id, sync_from: timestamp90DaysAgo }
-                    });
-
-                    const visits = vRes.data.result || [];
-                    if (visits.length >= MIN_VISITS_RECENT) {
-                        await axios.post(MAKE_WEBHOOK_VERLENGING, {
-                            member_id: member.member_id,
-                            voornaam: member.firstname,
-                            achternaam: member.lastname,
-                            telefoon: member.mobile || member.phone,
-                            contract_naam: contract.membership_name,
-                            einddatum: contract.contract_end_date,
-                            bezoeken_90_dagen: visits.length
-                        });
-                        sentCount++;
-                        console.log(`[${sentCount}/30] Verzonden: ${member.firstname}`);
-                        await sleep(3000); 
-                    }
-                }
+                console.log(`--- TEST DATA VERZONDEN NAAR MAKE (Check de Webhook!) ---`);
+                return; 
             }
-            if (members.length < 1000) hasMore = false;
         }
-        console.log(`--- SCAN KLAAR: ${sentCount} verzonden ---`);
-    } catch (e) { console.error("Fout:", e.message); }
+    } catch (e) { console.error("Fout tijdens test:", e.message); }
 }
-
-runRetentionBot();
+runTest();
