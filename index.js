@@ -70,10 +70,12 @@ async function runRetentionBot() {
 
                     const visits = vRes.data.result || [];
                     if (visits.length >= MIN_VISITS_RECENT) {
+                        // HIER WORDEN DE GEGEVENS NAAR MAKE GESTUURD
                         await axios.post(MAKE_WEBHOOK_VERLENGING, {
                             member_id: member.member_id,
                             voornaam: member.firstname,
                             achternaam: member.lastname,
+                            email: member.email, // <--- TOEGEVOEGD
                             telefoon: member.mobile || member.phone,
                             contract_naam: contract.membership_name,
                             einddatum: contract.contract_end_date,
@@ -81,7 +83,7 @@ async function runRetentionBot() {
                         });
                         
                         sentCount++;
-                        console.log(`[${sentCount}/30] Verzonden: ${member.firstname} ${member.lastname}`);
+                        console.log(`[${sentCount}/30] Verzonden: ${member.firstname} ${member.lastname} (${member.email})`);
                         await sleep(3000); 
                     }
                 }
