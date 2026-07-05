@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Vul hier JOUW eigen e-mailadres in (hier komt de testmail binnen):
-const TEST_EMAIL = "jouw@email.nl";   // <-- AANPASSEN
+const TEST_EMAIL = "info@yvsportfitclub.nl";   // <-- AANPASSEN
 
 const MAKE_WEBHOOK_VERLENGING = process.env.MAKE_WEBHOOK_VERLENGING;
 
